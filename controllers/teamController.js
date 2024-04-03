@@ -5,8 +5,6 @@ const createTeam = async (req, res) => {
   try {
     const { teamName, selectedUserIds, teamLeaderName } = req.body;
 
-    console.log(teamLeaderName, teamName, selectedUserIds);
-
     // Check if team name is provided
     if (!teamName) {
       return res
@@ -26,51 +24,40 @@ const createTeam = async (req, res) => {
       });
     }
 
-    // Check if team leader ID is provided
+    // Check if team leader name is provided
     if (!teamLeaderName) {
       return res
         .status(400)
         .json({ success: false, message: "Team leader name is required" });
     }
 
-    // Fetch selected users and team leader from the database
+    // Fetch selected users from the database
     const selectedUsers = await user.find({ _id: { $in: selectedUserIds } });
-    const teamLeader = await user.findOne({ name: teamLeaderName });
 
-    // Check if selected users and team leader are valid
-    if (!selectedUsers || selectedUsers.length === 0 || !teamLeaderName) {
+    // Check if selected users are valid
+    if (!selectedUsers || selectedUsers.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "Selected users or team leader not found",
+        message: "Selected users not found",
       });
     }
 
-    // Check for unique domains and availability of selected users
+    // Ensure unique domains among selected users
     const domains = new Set();
-    const availabilityMap = new Map();
-
     for (const user of selectedUsers) {
       if (domains.has(user.domain)) {
         return res.status(400).json({
           success: false,
-          message: `Duplicate domain found for user ${user.email}`,
+          message: `Users must have unique domains. Duplicate domain found: ${user.domain}`,
         });
       }
       domains.add(user.domain);
-
-      if (availabilityMap.has(user.available)) {
-        return res.status(400).json({
-          success: false,
-          message: `Duplicate availability found for user ${user.email}`,
-        });
-      }
-      availabilityMap.set(user.available, true);
     }
 
     // Create the team
     const newTeam = new team({
       teamName,
-      selectedUsers: selectedUsers.map((user) => user._id),
+      selectedUsers: selectedUserIds,
       teamLeader: teamLeaderName,
     });
 
@@ -114,7 +101,7 @@ const teamDetails = async (req, res) => {
 
 const getAllTeams = async (req, res) => {
   try {
-    const teams = await team.find({});
+    const teams = await team.find({}).sort({ createdAt: -1 });
 
     if (!teams || teams.length === 0) {
       return res.status(404).json({
